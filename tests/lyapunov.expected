@@ -1,0 +1,2 @@
+largest Lyapunov exponent over 100 time units: 0.9147 per unit time
+nearby states separate like e^(0.9147 t): a factor of e every 1.0932 time units

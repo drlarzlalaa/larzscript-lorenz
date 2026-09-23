@@ -1,0 +1,8 @@
+two starts, (1, 1, 1) and (1 + 1e-08, 1, 1)
+t=0  separation=1e-08
+t=5  separation=1.24531e-08
+t=10  separation=1.75773e-08
+t=15  separation=2.36724e-07
+t=20  separation=1.06825e-05
+t=25  separation=0.0032812
+t=30  separation=0.242192

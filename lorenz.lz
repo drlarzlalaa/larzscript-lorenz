@@ -1,0 +1,126 @@
+# LarzLorenz - deterministic chaos, written entirely in Larzscript.
+#
+#   larzscript lorenz.lz run --steps=2000 --every=500
+#   larzscript lorenz.lz diverge --eps=0.00000001
+#   larzscript lorenz.lz lyapunov --time=100
+#
+# Edward Lorenz's 1963 convection model:
+#
+#   dx/dt = sigma (y - x)
+#   dy/dt = x (rho - z) - y
+#   dz/dt = x y - beta z
+#
+# with the classic sigma = 10, rho = 28, beta = 8/3, integrated with
+# fourth-order Runge-Kutta at dt = 0.01 from (1, 1, 1). The system is
+# completely deterministic, yet two starts that differ by one part in a
+# hundred million end up on different sides of the attractor within about
+# 30 time units. `lyapunov` measures how fast: the largest Lyapunov
+# exponent, by the two-trajectory renormalisation method of Benettin et al.
+#
+# tools/reference.py is an independent Python implementation; the tests
+# were written only after both agreed to every printed digit.
+
+import "orbits" as orbits
+import "cli" as cli
+import "args" as argmod
+
+fn fail(msg) { print("error: " + msg); exit(1) }
+
+fn number(s, what) {
+  let x = nil
+  try { x = float(s) } catch e { fail(what + " must be a number, got '" + str(s) + "'") }
+  return x
+}
+
+let SIGMA = 10.0
+let RHO = 28.0
+let BETA = 8.0 / 3.0
+let DT = 0.01
+
+fn f(s) {
+  return [SIGMA * (s[1] - s[0]), s[0] * (RHO - s[2]) - s[1], s[0] * s[1] - BETA * s[2]]
+}
+
+fn shift(s, d, k) { return [s[0] + k * d[0], s[1] + k * d[1], s[2] + k * d[2]] }
+
+fn rk4(s) {
+  let k1 = f(s)
+  let k2 = f(shift(s, k1, DT / 2))
+  let k3 = f(shift(s, k2, DT / 2))
+  let k4 = f(shift(s, k3, DT))
+  let out = []
+  let i = 0
+  while i < 3 {
+    out.push(s[i] + DT / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]))
+    i = i + 1
+  }
+  return out
+}
+
+fn dist(a, b) {
+  let dx = a[0] - b[0]
+  let dy = a[1] - b[1]
+  let dz = a[2] - b[2]
+  return sqrt(dx * dx + dy * dy + dz * dz)
+}
+
+fn g4(x) { return str(round(x, 4)) }
+
+fn cmd_run(a) {
+  let steps = int(number(argmod.flag(a, "steps", "2000"), "--steps"))
+  let every = int(number(argmod.flag(a, "every", "500"), "--every"))
+  if steps < 1 or every < 1 { fail("--steps and --every must be at least 1") }
+  let s = [1.0, 1.0, 1.0]
+  let i = 0
+  while i <= steps {
+    if i % every == 0 {
+      print("t=" + str(round(i * DT, 2)) + "  x=" + g4(s[0]) + " y=" + g4(s[1]) + " z=" + g4(s[2]))
+    }
+    s = rk4(s)
+    i = i + 1
+  }
+}
+
+fn cmd_diverge(a) {
+  let eps = number(argmod.flag(a, "eps", "0.00000001"), "--eps")
+  if eps <= 0 { fail("--eps must be greater than zero, got " + str(eps)) }
+  let p = [1.0, 1.0, 1.0]
+  let q = [1.0 + eps, 1.0, 1.0]
+  print("two starts, (1, 1, 1) and (1 + " + str(eps) + ", 1, 1)")
+  let i = 0
+  while i <= 3000 {
+    if i % 500 == 0 { print("t=" + str(round(i * DT, 0)) + "  separation=" + str(dist(p, q))) }
+    p = rk4(p)
+    q = rk4(q)
+    i = i + 1
+  }
+}
+
+fn cmd_lyapunov(a) {
+  let n = int(number(argmod.flag(a, "time", "100"), "--time"))
+  if n < 1 { fail("--time must be at least 1") }
+  let p = [1.0, 1.0, 1.0]
+  let i = 0
+  while i < 1000 { p = rk4(p); i = i + 1 }
+  let d0 = float("1e-8")
+  let q = [p[0] + d0, p[1], p[2]]
+  let total = 0.0
+  let k = 0
+  while k < n {
+    let j = 0
+    while j < 100 { p = rk4(p); q = rk4(q); j = j + 1 }
+    let d = dist(p, q)
+    total = total + orbits.ln(d / d0)
+    q = [p[0] + (q[0] - p[0]) * d0 / d, p[1] + (q[1] - p[1]) * d0 / d, p[2] + (q[2] - p[2]) * d0 / d]
+    k = k + 1
+  }
+  print("largest Lyapunov exponent over " + str(n) + " time units: " + g4(total / n) + " per unit time")
+  print("nearby states separate like e^(" + g4(total / n) + " t): a factor of e every " + g4(n / total) + " time units")
+}
+
+let app = cli.new("lorenz", "deterministic chaos: the Lorenz system, in Larzscript")
+cli.command(app, "run", "print the trajectory from (1,1,1): run [--steps=N] [--every=N]", fn(a) { cmd_run(a) })
+cli.command(app, "diverge", "the butterfly effect: diverge [--eps=X]", fn(a) { cmd_diverge(a) })
+cli.command(app, "lyapunov", "measure the largest Lyapunov exponent: lyapunov [--time=N]", fn(a) { cmd_lyapunov(a) })
+
+cli.run(app, args)

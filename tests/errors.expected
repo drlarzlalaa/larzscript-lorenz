@@ -1,0 +1,4 @@
+error: --steps must be a number, got 'abc'
+error: --steps and --every must be at least 1
+error: --eps must be greater than zero, got 0
+error: --time must be at least 1
