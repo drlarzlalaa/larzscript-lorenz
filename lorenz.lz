@@ -64,6 +64,23 @@ fn dist(a, b) {
   return sqrt(dx * dx + dy * dy + dz * dz)
 }
 
+# x with at most n significant digits, written out in full (no exponent),
+# so the output is the same on every Larzscript version.
+fn sig(x, n) {
+  if x == 0 { return "0" }
+  let a = x < 0 ? -x : x
+  let e = 0
+  while a >= 10.0 { a = a / 10.0; e = e + 1 }
+  while a < 1.0 { a = a * 10.0; e = e - 1 }
+  if round(a, n - 1) >= 10.0 { e = e + 1 }
+  let d = n - 1 - e
+  if d >= 0 { return str(round(x, d)) }
+  let scale = 1.0
+  let k = 0
+  while k < -d { scale = scale * 10.0; k = k + 1 }
+  return str(int(round(x / scale, 0) * scale))
+}
+
 fn g4(x) { return str(round(x, 4)) }
 
 fn cmd_run(a) {
@@ -83,13 +100,13 @@ fn cmd_run(a) {
 
 fn cmd_diverge(a) {
   let eps = number(argmod.flag(a, "eps", "0.00000001"), "--eps")
-  if eps <= 0 { fail("--eps must be greater than zero, got " + str(eps)) }
+  if eps <= 0 { fail("--eps must be greater than zero, got " + sig(eps, 6)) }
   let p = [1.0, 1.0, 1.0]
   let q = [1.0 + eps, 1.0, 1.0]
-  print("two starts, (1, 1, 1) and (1 + " + str(eps) + ", 1, 1)")
+  print("two starts, (1, 1, 1) and (1 + " + sig(eps, 6) + ", 1, 1)")
   let i = 0
   while i <= 3000 {
-    if i % 500 == 0 { print("t=" + str(round(i * DT, 0)) + "  separation=" + str(dist(p, q))) }
+    if i % 500 == 0 { print("t=" + sig(i * DT, 6) + "  separation=" + sig(dist(p, q), 6)) }
     p = rk4(p)
     q = rk4(q)
     i = i + 1
